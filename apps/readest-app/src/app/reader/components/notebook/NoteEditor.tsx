@@ -14,6 +14,8 @@ import { buildHandwritingNote, extractHandwritingData } from '@/utils/handwritin
 const DEFAULT_STROKE_WIDTH = 2;
 const MIN_PRESSURE_STROKE_WIDTH = 1.5;
 const PRESSURE_STROKE_MULTIPLIER = 3;
+const LIGHT_STROKE_COLOR = '#111827';
+const DARK_STROKE_COLOR = '#f8fafc';
 
 interface NoteEditorProps {
   onSave: (selection: TextSelection, note: string) => void;
@@ -200,7 +202,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ onSave, onEdit }) => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.strokeStyle = isDarkMode ? '#f8fafc' : '#111827';
+      ctx.strokeStyle = isDarkMode ? DARK_STROKE_COLOR : LIGHT_STROKE_COLOR;
       ctx.lineWidth = getStrokeWidth(event);
     }
     canvas.setPointerCapture(event.pointerId);

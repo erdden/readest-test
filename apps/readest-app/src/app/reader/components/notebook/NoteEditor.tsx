@@ -11,6 +11,10 @@ import TextEditor, { TextEditorRef } from '@/components/TextEditor';
 import TextButton from '@/components/TextButton';
 import { buildHandwritingNote, extractHandwritingData } from '@/utils/handwriting';
 
+const DEFAULT_STROKE_WIDTH = 2;
+const MIN_PRESSURE_STROKE_WIDTH = 1.5;
+const PRESSURE_STROKE_MULTIPLIER = 3;
+
 interface NoteEditorProps {
   onSave: (selection: TextSelection, note: string) => void;
   onEdit: (annotation: BookNote) => void;
@@ -85,15 +89,20 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ onSave, onEdit }) => {
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const ratio = window.devicePixelRatio || 1;
-    canvas.width = rect.width * ratio;
-    canvas.height = rect.height * ratio;
+    const targetWidth = rect.width * ratio;
+    const targetHeight = rect.height * ratio;
+    if (canvas.width !== targetWidth) {
+      canvas.width = targetWidth;
+    }
+    if (canvas.height !== targetHeight) {
+      canvas.height = targetHeight;
+    }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = isDarkMode ? '#f8fafc' : '#111827';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = DEFAULT_STROKE_WIDTH;
     ctx.clearRect(0, 0, rect.width, rect.height);
     if (!handwritingDataUrl) return;
     const image = new Image();
@@ -101,7 +110,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ onSave, onEdit }) => {
       ctx.drawImage(image, 0, 0, rect.width, rect.height);
     };
     image.src = handwritingDataUrl;
-  }, [noteMode, handwritingDataUrl, isDarkMode]);
+  }, [noteMode, handwritingDataUrl]);
 
   const getAnnotationText = () => {
     return notebookEditAnnotation?.text || notebookNewAnnotation?.text || '';
@@ -181,14 +190,19 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ onSave, onEdit }) => {
   };
 
   const getStrokeWidth = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (event.pointerType !== 'pen' || !event.pressure) return 2;
-    return 1.5 + event.pressure * 3;
+    if (event.pointerType !== 'pen' || !event.pressure) return DEFAULT_STROKE_WIDTH;
+    return MIN_PRESSURE_STROKE_WIDTH + event.pressure * PRESSURE_STROKE_MULTIPLIER;
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (event.button !== 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.strokeStyle = isDarkMode ? '#f8fafc' : '#111827';
+      ctx.lineWidth = getStrokeWidth(event);
+    }
     canvas.setPointerCapture(event.pointerId);
     isDrawingRef.current = true;
     lastPointRef.current = getCanvasPoint(event);
@@ -203,7 +217,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ onSave, onEdit }) => {
     const nextPoint = getCanvasPoint(event);
     const lastPoint = lastPointRef.current;
     if (!ctx || !nextPoint || !lastPoint) return;
-    ctx.strokeStyle = isDarkMode ? '#f8fafc' : '#111827';
     ctx.lineWidth = getStrokeWidth(event);
     ctx.beginPath();
     ctx.moveTo(lastPoint.x, lastPoint.y);
@@ -216,6 +229,9 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ onSave, onEdit }) => {
 
   const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current) return;
+    if (canvasRef.current?.hasPointerCapture(event.pointerId)) {
+      canvasRef.current.releasePointerCapture(event.pointerId);
+    }
     isDrawingRef.current = false;
     lastPointRef.current = null;
     event.preventDefault();
